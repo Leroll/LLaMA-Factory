@@ -187,8 +187,8 @@ def convert_sharegpt(
         outputs["images"].append(convert_images(examples[dataset_attr.images][i]) if dataset_attr.images else [])
 
         # 在这里把id_key加进去，后面预测的时候就可以用上了
-        if "id_key" in example.keys():
-            outputs['id_key'] = example['id_key']
+        if "id_key" in examples.keys():
+            outputs['id_key'] = examples['id_key']
 
     return outputs
 

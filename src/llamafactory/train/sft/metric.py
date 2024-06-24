@@ -96,7 +96,7 @@ class ComputeMetricsRiskRadar:
         Uses the model predictions to compute metrics.
         """
         preds, labels = eval_preds
-        score_dict = {"rouge-1": [], "rouge-2": [], "rouge-l": [], "acc": []}
+        score_dict = {"rouge-1": [], "rouge-2": [], "rouge-l": [], "整体_acc": []}
 
         preds = np.where(preds != IGNORE_INDEX, preds, self.tokenizer.pad_token_id)
         labels = np.where(labels != IGNORE_INDEX, labels, self.tokenizer.pad_token_id)
@@ -127,7 +127,7 @@ class ComputeMetricsRiskRadar:
             
             # 新增acc部分
             acc = int(pred==label)
-            score_dict["acc"].append(round(acc * 100, 4))
+            score_dict["整体_acc"].append(round(acc * 100, 4))
         
         res = {k: float(np.mean(v)) for k, v in score_dict.items()}
             
@@ -138,7 +138,7 @@ class ComputeMetricsRiskRadar:
                                                                                        beta=1,
                                                                                        labels=unique_labels,
                                                                                        zero_division=0)
-        f1_scores = {"风险类_f1_score": []}  # 再加上各个类别的均值，比如风险类，经营勘察类
+        f1_scores = {"整体_f1_score":[], "风险类_f1_score": []}  # 再加上各个类别的均值，比如风险类，经营勘察类
         for l,p,r,f,s, in zip(unique_labels, precision, recall, f1_score, support):
             f = round(f * 100, 4)
             
@@ -146,6 +146,7 @@ class ComputeMetricsRiskRadar:
             short_l = short_l[:-1] if short_l[-1] == "_" else short_l
             key = short_l + "_f1_score"
             res[key] = f
+            f1_scores["整体_f1_score"].append(f)
             
             # 新增风险类的计算
             second_class = short_l.strip('_')[-1]
@@ -154,11 +155,11 @@ class ComputeMetricsRiskRadar:
                 f1_scores["风险类_f1_score"].append(f)
                 
                 # 各场景风险类
-                scene = short_l.strip().split("_")[0] + "_f1_score"
+                scene = short_l.strip().split("_")[0] + "_风险类_f1_score"
                 if scene not in f1_scores:
                     f1_scores[scene] = [f]
                 else:
                     f1_scores[scene].append(f)
         
-        res.update({k: float(np.mean(v)) for k,v in f1_socres.items()})
+        res.update({k: float(np.mean(v)) for k,v in f1_scores.items()})
         return res
