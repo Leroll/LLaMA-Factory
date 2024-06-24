@@ -25,7 +25,7 @@ from ...extras.misc import get_logits_processor
 from ...extras.ploting import plot_loss
 from ...model import load_model, load_tokenizer
 from ..trainer_utils import create_modelcard_and_push
-from .metric import ComputeMetrics
+from .metric import ComputeMetrics, ComputeMetricsRiskRadar
 from .trainer import CustomSeq2SeqTrainer
 
 
@@ -72,7 +72,7 @@ def run_sft(
         finetuning_args=finetuning_args,
         data_collator=data_collator,
         callbacks=callbacks,
-        compute_metrics=ComputeMetrics(tokenizer) if training_args.predict_with_generate else None,
+        compute_metrics=ComputeMetricsRiskRadar(tokenizer) if training_args.predict_with_generate else None,
         **tokenizer_module,
         **split_dataset(dataset, data_args, training_args),
     )
@@ -108,7 +108,11 @@ def run_sft(
             predict_results.metrics.pop("predict_loss", None)
         trainer.log_metrics("predict", predict_results.metrics)
         trainer.save_metrics("predict", predict_results.metrics)
-        trainer.save_predictions(dataset, predict_results)
+        # 这里新增 id_key 保存版本
+        if "id_key" in dataset.column_names:
+            trainer.save_predictions_risk_radar(dataset, predict_results)
+        else:
+            trainer.save_predictions(dataset, predict_results)
 
     # Create model card
     create_modelcard_and_push(trainer, model_args, data_args, training_args, finetuning_args)

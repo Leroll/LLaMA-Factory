@@ -186,6 +186,10 @@ def convert_sharegpt(
         outputs["tools"].append(examples[dataset_attr.tools][i] if dataset_attr.tools else "")
         outputs["images"].append(convert_images(examples[dataset_attr.images][i]) if dataset_attr.images else [])
 
+        # 在这里把id_key加进去，后面预测的时候就可以用上了
+        if "id_key" in example.keys():
+            outputs['id_key'] = example['id_key']
+
     return outputs
 
 
@@ -209,19 +213,39 @@ def align_dataset(
         convert_func = partial(convert_sharegpt, dataset_attr=dataset_attr, data_args=data_args)
 
     column_names = list(next(iter(dataset)).keys())
-    features = Features.from_dict(
-        {
-            "prompt": [
-                {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
-            ],
-            "response": [
-                {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
-            ],
-            "system": {"dtype": "string", "_type": "Value"},
-            "tools": {"dtype": "string", "_type": "Value"},
-            "images": [{"_type": "Image"}],
-        }
-    )
+    
+    # 同样这个地方，把id-key加进去
+    if 'id_key' in column_names:
+        features = Features.from_dict(
+            {
+                "prompt": [
+                    {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
+                ],
+                "response": [
+                    {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
+                ],
+                "system": {"dtype": "string", "_type": "Value"},
+                "tools": {"dtype": "string", "_type": "Value"},
+                "images": [{"_type": "Image"}],
+                
+                # 新增一项
+                "id_key": {"dtype": "string", "_type": "Value"}
+            }
+        )
+    else:
+        features = Features.from_dict(
+            {
+                "prompt": [
+                    {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
+                ],
+                "response": [
+                    {"role": {"dtype": "string", "_type": "Value"}, "content": {"dtype": "string", "_type": "Value"}}
+                ],
+                "system": {"dtype": "string", "_type": "Value"},
+                "tools": {"dtype": "string", "_type": "Value"},
+                "images": [{"_type": "Image"}],
+            }
+        )
     kwargs = {}
     if not data_args.streaming:
         kwargs = dict(

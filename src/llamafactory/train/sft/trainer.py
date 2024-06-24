@@ -158,3 +158,67 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
             for text, label, pred in zip(decoded_inputs, decoded_labels, decoded_preds):
                 res.append(json.dumps({"prompt": text, "label": label, "predict": pred}, ensure_ascii=False))
             writer.write("\n".join(res))
+    
+    def save_predictions_risk_radar(self, dataset: "Dataset", predict_results: "PredictionOutput") -> None:
+        r"""
+        Saves model predictions to `output_dir`.
+
+        A custom behavior that not contained in Seq2SeqTrainer.
+        """
+        if not self.is_world_process_zero():
+            return
+
+        output_prediction_file = os.path.join(self.args.output_dir, "generated_predictions.jsonl")
+        logger.info(f"Saving prediction results to {output_prediction_file}")
+
+        labels = np.where(
+            predict_results.label_ids != IGNORE_INDEX, predict_results.label_ids, self.tokenizer.pad_token_id
+        )
+        preds = np.where(
+            predict_results.predictions != IGNORE_INDEX, predict_results.predictions, self.tokenizer.pad_token_id
+        )
+
+        for i in range(len(preds)):
+            pad_len = np.nonzero(preds[i] != self.tokenizer.pad_token_id)[0]
+            if len(pad_len):
+                preds[i] = np.concatenate(
+                    (preds[i][pad_len[0] :], preds[i][: pad_len[0]]), axis=-1
+                )  # move pad token to last
+
+        decoded_inputs = self.tokenizer.batch_decode(
+            dataset["input_ids"], skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        decoded_labels = self.tokenizer.batch_decode(
+            labels, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+
+        with open(output_prediction_file, "w", encoding="utf-8") as writer:
+            res: List[str] = []
+            for text, label, pred, id_key in zip(decoded_inputs, decoded_labels, decoded_preds, dataset["id_key"]):
+                res.append(json.dumps({"id_key": id_key, "prompt": text, "label": label, "predict": pred}, ensure_ascii=False))
+            writer.write("\n".join(res))
+
+
+    def save_metrics(self, split, metrics, combined=True):
+        """
+        修改可以支持 utf-8 存储
+        """
+        if not self.is_world_process_zero():
+            return
+
+        path = os.path.join(self.args.output_dir, f"{split}_results.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=4, sort_keys=True, ensure_ascii=False)
+
+        if combined:
+            path = os.path.join(self.args.output_dir, "all_results.json")
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    all_metrics = json.load(f)
+            else:
+                all_metrics = {}
+
+            all_metrics.update(metrics)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(all_metrics, f, indent=4, sort_keys=True, ensure_ascii=False)

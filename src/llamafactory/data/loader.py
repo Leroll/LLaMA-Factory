@@ -188,6 +188,10 @@ def get_dataset(
                 desc="Running tokenizer on dataset",
             )
 
+        # 在这里把 id-key 救回来
+        if "id_key" in column_names:
+            column_names.remove("id_key")
+        
         dataset = dataset.map(preprocess_func, batched=True, remove_columns=column_names, **kwargs)
 
         if data_args.tokenized_path is not None:
